@@ -26,6 +26,7 @@ str_detect(str_to_lower("Dogs rule"), "dog")
 str_detect("I just got a dog", "d.g")
 str_detect("Who dug these holes in the yard?", "d.g")
 str_detect("dang what a mess", "d.g")
+str_detect("loud grinch", "d.g")
 
 # Character classes are lists of characters in brackets. They match any single
 # character in the list. So "d[ou]g" will match "dog" or "dug", but not "dig". Since character
@@ -52,6 +53,7 @@ str_detect("r2d2", "[:alpha:][:digit:][:alpha:][:alnum:]")
 # Inverting character classes
 # If you put a ^ as the first character within a character class, it will match
 # characters _not_ in that class
+str_detect("loud grinch", "d[^aeiu]g")
 
 
 # Matching multiple letters
@@ -67,17 +69,18 @@ str_detect("r2d2", "[:alpha:][:digit:][:alpha:][:alnum:]")
 str_detect("I just got a dog", "d[ou]+g")
 str_detect("Who dug these holes in the yard?", "d[ou]+g")
 str_detect("Does anyone here like to dig?", "d[ou]+g")
-str_detect("I think doug did", "d[ou]+g")
+str_detect("I think dg did", "d[ou]+g")
 
 # dou?g will match dog or doug, but not dug - the u is optional, everything else is required
 str_detect("I just got a dog", "dou?g")
-str_detect("Who dug these holes in the yard?", "dou?g")
+str_detect("Who dig these holes in the yard?", "d[ou]?g")
 str_detect("Does anyone here like to dig?", "dou?g")
-str_detect("I think doug did", "dou?g")
+str_detect("I think dig did", "dou?g")
 
 # d[ou]{2}g will match doug or duog, but not dog
 str_detect("doug", "d[ou]{2}g")
 str_detect("dog", "d[ou]{2}g")
+str_detect("doog", "d[ou]{2}g")
 
 # d[ou]{1,2}g will match doug or dog
 str_detect("doug", "d[ou]{1,2}g")
@@ -103,7 +106,8 @@ str_detect("boondoggle", "dog")
 #  \\b matches the boundary between words (note: in R this is written as \\b, but in some languages will be \b)
 # so "\\bdog\\b" will not match boondoggle, but will match dog
 str_detect("dog", "\\bdog\\b")
-str_detect("boondoggle", "\bdog\b")
+str_detect("boondoggle", "\\bdog\\b")
+str_detect("I have a dog", "\\bdog\\b")
 
 # "^d[ou]+g$" will match "dog", "doug", and "dug", but not "the dog ran quickly"
 str_detect("dog", "^d[ou]+g$")
