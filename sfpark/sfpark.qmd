@@ -66,7 +66,6 @@ Run the code cell below either by clicking the "play" button or pressing Ctrl-sh
 
 ```{r}
 library(tidyverse)  # library for dealing with tabular data
-library(lubridate)  # library for handling dates
 ```
 
 ### Load data

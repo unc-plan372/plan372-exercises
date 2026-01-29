@@ -32,7 +32,6 @@ it separately if we want to read Excel files.
 
 ```{r}
 library(tidyverse)
-library(lubridate)
 library(readxl)
 library(ggthemes)
 ```

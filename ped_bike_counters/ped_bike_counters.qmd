@@ -1,4 +1,6 @@
-# PLAN 372 Exercise 2: Data cleaning
+---
+title: PLAN 372 Exercise 2 - Data cleaning
+---
 
 
 In this exercise, we'll be working with data from automated bicycle counters in North Carolina,
@@ -13,7 +15,6 @@ to use it.
 
 ```{r}
 library(tidyverse)
-library(lubridate)
 library(ggthemes)
 
 ```
