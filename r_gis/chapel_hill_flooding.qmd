@@ -1,0 +1,235 @@
+---
+title: Chapel Hill Flooding
+author: Matt Bhagat-Conway
+---
+
+In the previous exercise, we made a bunch of maps. In this exercise, we'll start working with some of the analytical capabilities of GIS.
+
+Flooding has been a problem in Chapel Hill for years, with many homes, apartments, and businesses sitting in low-lying areas. While there are many risk factors for flooding, the simplest is just whether your property is near a creek or body of water. In this exercise, we'll identify properties in Chapel Hill that sit near bodies of water.
+
+First, load the libraries we need for spatial data analysis and mapping:
+
+
+```{r}
+library(tidyverse)
+library(sf)
+library(ggspatial)
+
+```
+
+We are going to (initially) need two files for this analysis: the waterbodies we've used previously, and "nc_orange_parcels_poly.shp", which contains information on land "parcels" (i.e. lots) in Orange and Durham counties. They are both in the ZIP file you downloaded. You don't need to create `.Renviron` again, but you will need to use DATA_PATH to load the datasets. Load them now. Call the waterbodies `waterbodies` and the parcels `parcels`.
+
+
+```{r}
+# answer:
+
+```
+
+You likely got some warnings reading the parcel layer. Run `warnings()` to see what they were - for me they seem to only affect the RECAREANO field which we won't be using.
+
+## Map them
+
+Map the parcels and water bodies, just to get an idea what we're looking at.
+
+
+```{r}
+# answer:
+
+```
+
+## What is near water?
+
+To figure out what is near water, we can use a geoprocessing operation known as a "buffer". There are literally hundreds of geoprocessing operations that exist. The buffer is one of the most common. It expands a spatial feature by a certain amount. In this case, we are going to assume that 150 meters is the "risky" area around a water body (of course this also depends on topography and a bunch of other factors - for instance, my own house is only about 75 meters from a small stream, but is also 10 meters higher in elevation so well protected).
+
+We can buffer a spatial dataset using the function `st_buffer`, which will create a new spatial dataset including the buffer. `st_buffer` takes the layer as the first argument, and the amount to buffer by as the second argument, in the same units as the map data.
+
+This raises a question: what are the units of the map data? 
+
+## Projections and coordinate systems
+
+Take a look at the `geometry` column in the parcels dataset:
+
+
+```{r}
+head(parcels)
+
+```
+
+What are the units of that geometry column? is it likely that all the parcels in Chapel Hill are like 79 feet, or meters, etc, from somewhere?
+
+The data are currently represented in "geographic" coordinates, i.e. degrees of latitude and longitude. The problem is that we can't just convert meters into degrees and get a meaningful answer.
+
+To understand why, we have to think a bit about degrees of latitude and longitude. Degrees of latitude are the angle at the center of the earth between the equator and any point on the surface.
+
+Check your understanding:
+
+- What is the range of latitude values, i.e. what is the lowest and highest latitude? (answer: )
+- How long is a degree of latitude (hint: the circumference of the earth is roughly 40,000 km)? (answer: )
+
+Now, let's think about longitude. Your longitude is the angle at the center of the Earth between the prime meridian, which is a north/south line that passes through the Greenwich Observatory in London. (Fun fact: it was always obvious where to put the Equator. But the prime meridian is arbitrary, and until 1884 many countries used their own—the United Kingdom used Greenwich, France used Paris, the US meant to use the Washington Monument but the ground was too swampy there so they moved the monument about 100 meters east but kept the meridian where it was supposed to be, and so on).
+
+Check your understanding:
+
+- What is the range of longitude values? (answer: )
+- How long is a degree of longitude? (answer: )
+
+Ultimately, a degree of longitude depends on your latitude. If the earth were perfectly spherical, the length of a degree of longitude would be 111.1 * cos(latitude), or about 90.4 km at 35.5 degrees latitude like we are in the Triangle. Does this explain why the map appears squished (or stretched horizontally might be an easier way to think about it).
+
+To fix this, we can use a projected coordinate system. A projected coordinate system is a flat approximation of the spherical earth, which means that the units are meters or feet and thus the same length in all directions. A good choice in the US is the State Plane Coordinate System (currently the 1983 version, but there is a new version coming out in 2026).
+
+Projections have numeric codes associated with them, often referred to as EPSG codes after the European Petroleum Survey Group that invented and maintains them. The data we have are in EPSG:4326, which is the most common of several geographic coordinate systems (that make slightly different assumptions about the shape of the earth). North Carolina State Plane has a code of 32119. We can convert our water bodies to North Carolina State Plane by using `st_transform`:
+
+
+```{r}
+waterbodies = st_transform(waterbodies, 32119)
+head(waterbodies)
+
+```
+
+Note that the xmin, xmax are different, and there is now a line about a Projected CRS.
+
+Now we are ready to buffer. Since the units of State Plane North Carolina are meters, we can just set the buffer distance to 150 (there are also versions of State Plane North Carolina that use feet, but 32119 refers to the version using meters).
+
+
+```{r}
+water_buffer = st_buffer(waterbodies, 150)
+
+```
+
+Map that, adding water_buffer to the map below the water bodies but above the parcels. It will look best if you make it partially transparent by putting `alpha=0.5` in `geom_sf`.
+
+
+```{r}
+ggplot() +
+    geom_sf(data=parcels) +
+    geom_sf(data=water_buffer, color="lightblue", fill="lightblue", alpha=0.5) +
+    geom_sf(data=waterbodies, color="blue", fill="blue") +
+    theme_minimal() +
+    theme(
+        axis.text = element_blank(),
+        panel.grid = element_blank()
+    ) +
+    coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511))
+
+```
+
+## Aggregating the analysis
+
+This is already a useful map in that it shows where places might be at risk. However, it would also be useful to know just how many properties we are talking about here. We can do that by creating a column in parcels that says whether a
+particular parcel overlaps the buffer.
+
+The `st_intersects` function will let us do that. `st_intersects` returns a matrix (table), showing
+which parcels touch which buffers. We can use the apply function to turn this
+into single column. The apply function is used to apply an operation to every row or column
+of a table/matrix. The second argument indicates what to apply the operation to: 1 for rows,
+2 for columns. There is one row for each of the features in the first layer we gave to
+st_intersects, and one column for each feature in the second. So we want to apply the "any" operation to
+each row to find out if that parcel touched any other parcel. We save that as a new column.
+
+
+```{r}
+parcels$at_risk = apply(st_intersects(parcels, water_buffer), 1, any)
+
+```
+
+Geoprocessing requires all layers to have the same projection aka Coordinate Reference System (CRS), and this error is indicating that they do not. We can just reproject the parcels as well. In future, it's a good practice to just reproject everything to a common coordinate system before doing any analysis.
+
+
+```{r}
+parcels = st_transform(parcels, 32119)
+
+```
+
+Now we can create the column.
+
+
+```{r}
+parcels$at_risk = apply(st_intersects(parcels, water_buffer), 1, any)
+
+```
+
+At this point, we can map the at-risk parcels to make sure that everything looks right:
+
+
+```{r}
+ggplot() +
+    geom_sf(data=parcels, aes(fill=at_risk)) +
+    geom_sf(data=water_buffer, color="lightblue", fill="lightblue", alpha=0.5) +
+    geom_sf(data=waterbodies, color="blue", fill="blue") +
+    theme_minimal() +
+    theme(
+        axis.text = element_blank(),
+        panel.grid = element_blank()
+    ) +
+    coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511))
+
+```
+
+Why did that come out blank?
+
+It's because of our `coord_sf` call. By default, `coord_sf` will interpret the limits in whatever projection the first layer is using, which is now State Plane and uses meters, but our limits are still in degrees. The easiest fix is to just tell `coord_sf` to use a different default CRS than the one the data uses; then it will translate the limits from that CRS to the one the data use. Here, we specify the default CRS as 4326 (aka WGS 84) which is the most common geographic coordinate system (there are a few others, e.g. 4269, which make slightly different assumptions about the shape of the earth). We specify the crs of the map itself as 32119 to match the data.
+
+
+```{r}
+ggplot() +
+    geom_sf(data=parcels, aes(fill=at_risk)) +
+    geom_sf(data=water_buffer, color="lightblue", fill="lightblue", alpha=0.5) +
+    geom_sf(data=waterbodies, color="blue", fill="blue") +
+    theme_minimal() +
+    theme(
+        axis.text = element_blank(),
+        panel.grid = element_blank()
+    ) +
+    coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511), crs=32119, default_crs=4326)
+
+```
+
+Now, we can treat that parcels dataset just like any non-spatial dataset for analysis. First, let's just count the number of at-risk parcels. `st_drop_geometry` doesn't affect the answer, but removes the spatial part of the dataset which makes processing faster.
+
+
+```{r}
+parcels |>
+    st_drop_geometry() |>
+    count(at_risk)
+
+```
+
+## Construction in the flood zone
+
+Ideally we would hope that there's not much construction going on on these at-risk properties. We can check that by looking at building permit records. There is a file `parcel_permits.csv` in the GIS data folder that contains permit information for the Town of Chapel Hill. Load that file and call the dataset `permits`.
+
+
+```{r}
+# answer
+
+```
+
+Join the permits data to the parcels data, and call the result `parcel_permits`.
+
+
+```{r}
+# answer
+
+```
+
+
+```{r}
+# how many parcel_permit records have construction costs
+sum(!is.na(parcel_permits$total_construction_cost))
+
+# how many parcel records do we have?
+nrow(permits)
+
+# We'd expect these to be exactly the same. If this were a real project and not an exercise,
+# I'd investigate the ones that didn't match thoroughly - they may be due for example due
+# to differing ages of the data (the parcels are recent and the permits dataset is older).
+
+```
+
+Sum up how much construction (field `total_construction_cost`) has occurred on at-risk and not at-risk parcels in Chapel Hill. There will be a lot of NAs, from parcels that are either not in Chapel Hill or haven't had any construction. Think about how those affect the analysis and what to do with them.
+
+
+```{r}
+# answer
+
+```
