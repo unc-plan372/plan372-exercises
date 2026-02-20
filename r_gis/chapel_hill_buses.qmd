@@ -1,0 +1,777 @@
+---
+title: Chapel Hill Flooding
+author: Matt Bhagat-Conway
+---
+
+## Load libraries
+
+As always, we start by loading libraries. Here, we see a new library: the `sf` library, designed for working with spatial data in R.
+
+
+```{r}
+library(tidyverse)
+library(sf) # this is the "simple features" package, designed for GIS work in R
+library(ggspatial) # this provides some extra features for mapping with ggplot
+library(leaflet)
+
+```
+
+## Reading in data
+
+Up to now, we've used `read_csv` to read CSV files and `read_excel` to read Excel files. In all cases, these files were quite small and not sensitive, and could be stored in the git repository itself. The spatial datasets we're working with here are much larger, too large to be stored in the repository itself. Instead, we will have to download them from Canvas, and store them someplace else on our computers.
+
+The problem is that this will be a different place on everyone's computer. For example, I might have the files at `/Users/mwbc/unc/gis-data/`, but you will have them in a different location. We could just have everyone adjust the path themselves, but if we were working collaboratively on a project that would quickly get problematic. Instead, we will use _environment variables_ and an `.Renviron` file to specify where the files are on each machine. Environment variables are just text names and values that can be shared across multiple R scripts (and, depending on how you set them up, other programs as well). This way, if you run your code on a different computer, you just have to update `.Renviron` and all the code will work.
+
+Environment variables are defined outside of your R script or Quarto document. There are many ways to set up environment variables, but we are going to use an `.Renviron` file. First, download the GIS data from Canvas and unzip it, and put the folder somewhere on your computer.
+
+Next, we will create an environment variable to tell R where to find the files. Create a `.Renviron` file by choosing File -> New File -> Text File. By convention, the names of environment variables are all caps with words separated by underscores, so we will call our environment variable `DATA_PATH`. Put this in your `.Renviron`:
+
+DATA_PATH="/path/to/plan372_gis_data"
+
+On Windows, the path will start with `C:\`. If there are backslashes (i.e. `\`, not `/`) in the path, you need to replace each single backslash with a double backslash.
+
+Save the file as `.Renviron` in your `plan372-exercises` folder (without the backticks). Make sure the file is called `.Renviron`, not `.Renviron.txt`.
+
+We can access environment variables in R using the `Sys.getenv` function. However, first we need to restart R (which we will have to do any time we change `.Renviron`). Do this by choosing Session -> Restart R, and then run the cell above to load libraries.
+
+If you have set up your `.Renviron` correctly, the cell below should store the environment variable `DATA_PATH` in the R variable `DATA_PATH`, and then print out the contents of the GIS data directory.
+
+
+```{r}
+DATA_PATH = Sys.getenv("DATA_PATH")
+list.files(DATA_PATH)
+
+```
+
+You should get this output:
+
+    [1] "chapel_hill_transit_stops.csv"  "goraleigh-stops.txt"            "orange_durham_osm_highways.dbf"
+    [4] "orange_durham_osm_highways.prj" "orange_durham_osm_highways.shp" "orange_durham_osm_highways.shx"
+    [7] "orange_durham_parcels.cpg"      "orange_durham_parcels.dbf"      "orange_durham_parcels.prj"     
+    [10] "orange_durham_parcels.shp"      "orange_durham_parcels.shx"      "orange_durham_parcels.xml"     
+    [13] "restaurant_inspections_geo.csv" "wake_osm_highways.dbf"          "wake_osm_highways.prj"         
+    [16] "wake_osm_highways.shp"          "wake_osm_highways.shx"          "Waterbodies.cpg"               
+    [19] "Waterbodies.dbf"                "Waterbodies.prj"                "Waterbodies.shp"               
+    [22] "Waterbodies.shx" 
+
+If you don't, your path is not set correctly in your `.Renviron`. If you see `plan372_gis_data` in the output, you just need to add `/plan372_gis_data` to the end of the path in `.Renviron`, and restart R.
+
+## Working with GIS data
+
+This script works through how to work with spatial data using the following datasets
+ 
+1. orange_durham_osm_highways: Roads in Orange and Durham counties, from OpenStreetMap
+2. Waterbodies: Bodies of water in the Chapel Hill area, from Chapel Hill Open Data
+3. orange_durham_parcels: Parcels (plots of land) in Orange and Durham counties
+4. chapel_hill_transit_stops.csv: bus stups in chapel hill, contains number of the average number of buses per day for each stop
+
+### Reading data
+
+First, we read in our datasets. To read a GIS file, we use the `st_read` function, which comes from `sf`. `st_read` can read most vector GIS datasets. A vector GIS dataset just means a dataset of points, lines, or polygons, with associated attributes. Let's start with highways. This is a shapefile (note the .shp extension)
+
+`file.path` just puts two (or more) paths together. So `file.path(DATA_PATH, "orange_durham_osm_highways.shp")` just refers to the `orange_durham_osm_highways.shp` file inside the folder specified by DATA_PATH.
+
+
+```{r}
+orange_durham_osm_highways = st_read(file.path(DATA_PATH, "orange_durham_osm_highways.shp"))
+
+#as always, good practice is to inspect your data. Is everything looking as expected?
+head(orange_durham_osm_highways)
+
+```
+
+Notice the geometry field at the end. This is what tells R where/how to map the object.
+
+### Making a map
+
+Our plan is to make a map of Chapel Hill/Durham's highways/road system and plot bus stops. We have already read in the highways. We also need to read in the water bodies. Do that now.
+
+
+```{r}
+# answer:
+
+```
+
+There are a number of packages for making maps. The easiest is to just use one we've already been using: `ggplot`. This will map the roads and water bodies in Chapel Hill.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies) +
+  geom_sf(data = orange_durham_osm_highways)
+
+```
+
+That is pretty ugly. We can zoom in on Chapel Hill. The units of `xlim` and `ylim` are degrees of longitude and latitude, respectively. You can find the degrees of latitute and longitude for any location in many ways, but the simplest is just to right-click on a location on Google Maps.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies) +
+  geom_sf(data = orange_durham_osm_highways) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511))
+
+```
+
+That is looking much better, but we might want the water bodies to be in blue.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, color="blue", fill="blue") +
+  geom_sf(data = orange_durham_osm_highways) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  # and this will remove the coordinates from the axes
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  )
+
+```
+
+This is a little different than how we've used ggplot in the past - we specified the data inside the geoms themselves because we're using two different datasets, and we haven't specified an aes because there are no data attributes being mapped onto plot characteristics.
+
+#### Legends
+
+With a simple map like this, it's pretty easy to tell what is what - the black is obviously roads/paths and the blue is obviously water. It's good practice to include a legend anyhow, and it will be important on more complex maps.
+
+`ggplot` only creates legends for values specified in an aes. We can specify an aes with the label of each layer, rather than a column (note that it must be in quotes).
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  # and this will remove the coordinates from the axes
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  )
+
+```
+
+That looks... pretty bad. We need to tell ggplot how we want each part of our map colored. We do this with `scale_fill_manual` and `scale_color_manual` to tell it what color "Water" and "Roadways" are.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  # and this will remove the coordinates from the axes and the grid from the map
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray"), aesthetics=c("color", "fill"))
+  
+
+```
+
+This is still non-ideal; we really want to combine those. We can tell ggplot to combine those into a single legend, titled "Legend", by telling ggplot to make legends for the color and fill and call them both "Legend":
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray"), aesthetics=c("color", "fill")) +
+  guides(color=guide_legend(title="Legend"), fill=guide_legend(title="Legend"))
+
+```
+
+#### Adding CSV data to the map
+
+There is another file in the GIS data folder, `chapel_hill_transit_stops.csv` which contains information on the location of transit stops in Chapel Hill. Read in that CSV file, and call the dataset `bus_stops`.
+
+
+```{r}
+# answer:
+
+```
+
+If we try to just add that layer to the map directly, it won't work:
+
+
+```{r}
+ggplot() +
+  geom_sf(data = bus_stops, aes(color = "Bus Stop")) +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray", "Bus Stop"="red"), aesthetics=c("color", "fill")) +
+  guides(color=guide_legend(title="Legend"), fill=guide_legend(title="Legend"))
+
+```
+
+The bus stops came from a CSV file, not a GIS file, so they don't automatically have geometry associated with them. Take a look at the data and see if there are any columns we might use to figure out where these stops are:
+
+
+```{r}
+head(bus_stops)
+
+```
+
+It looks like columns `stop_lat` and `stop_lon` have the latitude and longitude values of the stops. We just need to tell R about what the columns are. `crs=4326` just tells R to interpret them as latitude/longitude (we'll discuss more about this in the next exercise). We tell R that the coordinates are `stop_lon` and `stop_lat` (while that order may seem backwards, GIS usually puts east-west location first and north-south second).
+
+
+```{r}
+bus_stops = st_as_sf(bus_stops, coords=c("stop_lon", "stop_lat"), crs=4326)
+
+```
+
+Now we can try that map again:
+
+
+```{r}
+ggplot() +
+  geom_sf(data = bus_stops, aes(color = "Bus Stop")) +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray", "Bus Stop"="red"), aesthetics=c("color", "fill")) +
+  guides(color=guide_legend(title="Legend"), fill=guide_legend(title="Legend"))
+
+```
+
+This is better, but the bus stops are appearing behind the roads. We can fix this by just changing the order of the layers; layers are drawn bottom-to-top in the order they are specified.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  geom_sf(data = bus_stops, aes(color = "Bus Stop")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray", "Bus Stop"="red"), aesthetics=c("color", "fill")) +
+  guides(color=guide_legend(title="Legend"), fill=guide_legend(title="Legend"))
+
+```
+
+#### Mapping data values to map aesthetics
+
+There's also some extra data in the bus stops dataset which shows how many buses per day serve each stop. We can map those to map attributes just like we did for any other type of plot in ggplot:
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, color="Blue", fill="Blue") +
+  geom_sf(data = orange_durham_osm_highways, color="Gray") +
+  geom_sf(data = bus_stops, aes(color = buses_per_day)) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  )
+
+```
+
+I've also simplified the legend a bit by removing the legend entries for water and roads as these are basically just background information. If you wanted to keep them, you would need to be able to specify color aesthetics and scales for them separately from the bus stops. ggplot on its own can't do this, but if you wanted to do this the `ggnewscale` package can.
+
+It's hard to make much sense of that map; almost all the bus stops appear black. That's probably because of outliers; the busiest stop looks like it serves 500 buses a day! Make a histogram of buses per day to check.
+
+
+```{r}
+# answer:
+
+```
+
+Indeed there are a few high outliers. To make the map more readable, we can apply a different color scheme. It is typical on maps to use a binned color scheme where a single color represents a range; it is easier for folks to figure out what the value for a particular location might be.
+
+To do this, you have to tell ggplot what you want the breakpoints between different colors to be. Here, I am setting them to quintiles of the distribution of buses per day, so there are roughly equal numbers of bus stops in each category.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, color="Blue", fill="Blue") +
+  geom_sf(data = orange_durham_osm_highways, color="Gray") +
+  geom_sf(data = bus_stops, aes(color = buses_per_day)) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_binned(
+    # unname here just makes the legend be labeled in terms of the actual
+    # values rather than 20%, 40%, 60%, etc.
+    # this is also one of the few places in ggplot where you have to use
+    # $ notation for columns.
+    breaks=unname(quantile(bus_stops$buses_per_day, c(0, 0.2, 0.4, 0.6, 0.8, 1))),
+    limits=range(bus_stops$buses_per_day),
+    palette="Blues"
+  )
+
+```
+
+## Other map elements
+
+In addition to a legend, maps often have a scale bar to help folks interpret what they're looking at, and attribution for data sources. Those are both easy to add. We add an `annotation_scale()` from the ggspatial package to get a scale bar.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, color="Blue", fill="Blue") +
+  geom_sf(data = orange_durham_osm_highways, color="Gray") +
+  geom_sf(data = bus_stops, aes(color = buses_per_day)) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_binned(
+    # unname here just makes the legend be labeled in terms of the actual
+    # values rather than 20%, 40%, 60%, etc.
+    # this is also one of the few places in ggplot where you have to use
+    # $ notation for columns.
+    breaks=unname(quantile(bus_stops$buses_per_day, c(0, 0.2, 0.4, 0.6, 0.8, 1))),
+    limits=range(bus_stops$buses_per_day),
+    palette="Blues"
+  ) +
+  annotation_scale()
+
+```
+
+It is also typical to add attribution for any data you got from elsewhere in the lower right (and in some cases this may be a legal requirement). We can do this with the ggplot `annotate` function. Setting the position to `Inf, -Inf` just says to place the text as far right and as far down as possible, and hjust/vjust adjust the positioning to bring the text back onto the map.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, color="Blue", fill="Blue") +
+  geom_sf(data = orange_durham_osm_highways, color="Gray") +
+  geom_sf(data = bus_stops, aes(color = buses_per_day)) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511)) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_binned(
+    # unname here just makes the legend be labeled in terms of the actual
+    # values rather than 20%, 40%, 60%, etc.
+    # this is also one of the few places in ggplot where you have to use
+    # $ notation for columns.
+    breaks=unname(quantile(bus_stops$buses_per_day, c(0, 0.2, 0.4, 0.6, 0.8, 1))),
+    limits=range(bus_stops$buses_per_day),
+    palette="Blues"
+  ) +
+  annotation_scale() +
+  annotate("label", Inf, -Inf, label="Map data © OpenStreetMap contributors, Town of Chapel Hill", fill="white", hjust=1.01, vjust=-0.1)
+
+```
+
+## Quick data exploration with Leaflet
+
+ggplot is great for high-quality maps, but sometimes we just want something easy and interactive to explore our data. The leaflet package provides that. We can add our bus stops to an interactive map like this:
+
+
+```{r}
+leaflet() |>
+  addTiles() |>
+  addCircleMarkers(data=bus_stops, popup=~stop_name)
+
+```
+
+In addition to circles for point locations, you can also draw lines. To keep this from being too slow, I am also telling it to filter the roadways just to major roads (using the [OpenStreetMap roadway taxonomy](https://wiki.openstreetmap.org/wiki/Key:highway)).
+
+
+```{r}
+leaflet() |>
+  addTiles() |>
+  addPolylines(data=filter(
+      orange_durham_osm_highways,
+      highway %in% c("motorway", "trunk", "primary", "secondary", "tertiary")
+    ), popup=~name) |>
+    addCircleMarkers(data=bus_stops, popup=~stop_name)
+
+
+```
+
+## Projections and coordinate systems
+
+Take a close look at UNC campus (center-bottom of the map). Does it look right to you? Feel free to compare with another map, e.g. Google Maps.
+
+It probably looks kinda squished, shorter than it should be. This is because the data are currently represented in "geographic" coordinates, i.e. degrees of latitude and longitude. We can confirm this by looking at any layer:
+
+
+```{r}
+head(orange_durham_osm_highways)
+
+```
+
+Note that the geometry column contains values that are between -180 and +180.
+
+To understand why this leads to the data looking squished, we have to think a bit about degrees of latitude and longitude. Degrees of latitude are the angle at the center of the earth between the equator and any point on the surface.
+
+Check your understanding:
+
+- What is the range of latitude values, i.e. what is the lowest and highest latitude? (answer: )
+- How long is a degree of latitude (hint: the circumference of the earth is roughly 40,000 km)? (answer: ) / 90 degrees = 111.1 km)
+
+Now, let's think about longitude. Your longitude is the angle at the center of the Earth between the prime meridian, which is a north/south line that passes through the Greenwich Observatory in London. (Fun fact: it was always obvious where to put the Equator. But the prime meridian is arbitrary, and until 1884 many countries used their own—the United Kingdom used Greenwich, France used Paris, the US meant to use the Washington Monument but the ground was too swampy there so they moved the monument about 100 meters east but kept the meridian where it was supposed to be, and so on).
+
+Check your understanding:
+
+- What is the range of longitude values? (answer: )
+- How long is a degree of longitude? (answer: )
+
+Ultimately, a degree of longitude depends on your latitude. If the earth were perfectly spherical, the length of a degree of longitude would be 111.1 * cos(latitude), or about 90.4 km at 35.5 degrees latitude like we are in the Triangle. Does this explain why the map appears squished (or stretched horizontally might be an easier way to think about it).
+
+To fix this, we can use a projected coordinate system. A projected coordinate system is a flat approximation of the spherical earth, which means that the units are meters or feet and thus the same length in all directions. A good choice in the US is the State Plane Coordinate System (currently the 1983 version, but there is a new version coming out in 2026).
+
+Projections have numeric codes associated with them, often referred to as EPSG codes after the European Petroleum Survey Group that invented and maintains them. The data we have are in EPSG:4326, which is the most common of several geographic coordinate systems (that make slightly different assumptions about the shape of the earth). North Carolina State Plane has a code of 32119; we can tell our map to use this projection by adding `crs=32119` to our coord_sf.
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511), crs=32119) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  # and this will remove the coordinates from the axes
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray"), aesthetics=c("color", "fill")) +
+  guides(color=guide_legend(title="Legend"), fill=guide_legend(title="Legend"))
+
+```
+
+What happened?
+
+Our `xlim` and `ylim` are still in geographic coordinates but the map no longer is. We could change this, but it's kind of a pain to think about the projected coordinates as they tend to be really large numbers. We can also tell ggplot to handle this by setting a `default_crs` which will be used for `xlim` and `ylim`:
+
+
+
+```{r}
+ggplot() +
+  geom_sf(data = waterbodies, aes(color="Water", fill="Water")) +
+  geom_sf(data = orange_durham_osm_highways, aes(color="Roadways")) +
+  coord_sf(xlim=c(-79.0755, -79.0031), ylim=c(35.8943, 35.9511), crs=32119, default_crs=4326) +
+  # adding theme_minimal will get rid of the gray background
+  theme_minimal() +
+  # and this will remove the coordinates from the axes
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("Water"="blue", "Roadways"="gray"), aesthetics=c("color", "fill")) +
+  guides(color=guide_legend(title="Legend"), fill=guide_legend(title="Legend"))
+
+```
+
+There's also some 
+
+##
+
+#ok, it's looking a lot better. 
+#we can "toggle" layers on/off by choosing which ones to display
+#all you need to do is comment out the ones you don't want to show
+#for this exercise, we only really want to focus on roads and bus stops
+#turn off the water bodies and parcel layers
+
+#Now let's add in bus stops
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  geom_sf(data = waterbodies, fill="lightblue", color="lightblue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops)+
+  coord_sf(xlim = c(-79.12, -78.88), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  theme_minimal() 
+
+
+#A couple of observations, one map is too big, let's play with lat/lon some more
+#black dots show locations
+#but the data has some interesting information --buses per day. 
+#Let's show where the more popular bus stop are on the map
+
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops, aes(color = factor(buses_per_day)))+ 
+  # can treat buses_per_day as continuous or discrete (use factor for discrete)
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  theme_minimal() 
+
+
+#oh boy...this is way too much. 
+
+ 
+length(unique(ch_bus_stops$buses_per_day))
+#buses_per_day has 95 unique values!!!
+#way to much to show each one on map
+#let's divide into buckets based on quartile
+ 
+ch_bus_stops_quartile1 <- ch_bus_stops %>% 
+  mutate(quartile = cut(buses_per_day, quantile(buses_per_day), include.lowest=TRUE, labels=FALSE),
+         quartile_label = factor(quartile, 
+                                 levels = 1:4,  # factor assumes character, this tells it to use numbers
+                                 labels = c("1st quartile", "2nd quartile", "3rd quartile", "4th quartile")))
+
+#let's say you wanted to know actual ranges instead, how would you do that?
+ch_bus_stops_quartile2 <- ch_bus_stops %>% 
+  mutate(quartile = cut(buses_per_day, quantile(buses_per_day), include.lowest=TRUE, labels=FALSE)) %>% 
+  group_by(quartile) %>% 
+  mutate(quartile_range_min = min(buses_per_day, na.rm=T),
+         quartile_range_max = max(buses_per_day, na.rm=T),
+         quartile_range = paste(quartile_range_min,quartile_range_max,sep="-"),
+         prefix = case_when(quartile==1 ~ "1st quartile:",
+                            quartile==2 ~ "2nd quartile:",
+                            quartile==3 ~ "3rd quartile:",
+                            quartile==4 ~ "4rth quartile:",
+                            TRUE ~ as.character(quartile)),
+         new_label = paste(prefix, quartile_range, sep=" "),
+         quartile_label = factor(new_label)) %>% 
+  ungroup
+
+class(ch_bus_stops_quartile2$quartile)
+unique(ch_bus_stops_quartile2$quartile_range)
+
+#ok, this should be more manageable
+
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops_quartile2, aes(color = quartile_label))+ 
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  theme_minimal()
+
+#ok much better. Though I don't like the colors R chose. I want to specify my own
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops_quartile2, aes(color = quartile_label))+ 
+  scale_color_manual(values = c("lightblue","skyblue", "blue", "darkblue"))+
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  theme_minimal()
+
+
+#I don't like the label for my lengend. How do I change that?
+
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops_quartile2, aes(color = quartile_label))+ 
+  scale_color_manual(values = c("lightblue","skyblue", "blue", "darkblue"))+
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  labs(colour="Buses per day (quartiles)") +
+  theme_minimal()
+
+
+#let's add some symbology (scale bar, North arrow, and legend)
+#let's start with scale bar
+#we'll need another package for this (ggspatial)
+#also ggspatial helps with north arrow so two for one!
+#I don't have this installed so need to get it first
+install.packages("ggspatial") #first instal
+library(ggspatial) #then load
+#I would normally put this loading of the package at the top of my script, including 
+#here because I'm going step by step/instructional purposes
+
+
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops_quartile2, aes(color = quartile_label))+ 
+  scale_color_manual(values = c("lightblue","skyblue", "blue", "darkblue"))+
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  labs(colour="Buses per day (quartiles)") +
+  annotation_scale(location = "br", width_hint = 0.3) +  # Scale bar
+  annotation_north_arrow(location = "tl", which_north = "true", 
+                         style = north_arrow_fancy_orienteering()) +  # North arrow
+  theme_minimal() 
+
+#can play around with locations of items on map
+#br means bottom right
+#tl means top left
+
+#let's move the scale bar to the bottom left
+ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops_quartile2, aes(color = quartile_label))+ 
+  scale_color_manual(values = c("lightblue","skyblue", "blue","black"))+
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  labs(colour="Buses per day (quartiles)") +
+  annotation_scale(location = "bl", width_hint = 0.3) +  # Scale bar
+  annotation_north_arrow(location = "tl", which_north = "true", 
+                         style = north_arrow_fancy_orienteering()) +  # North arrow
+  theme_minimal() +
+  theme(axis.text = element_blank())
+
+ggsave("plan372_gis_data/in_class_map.png")
+
+
+#good if want to create a map to save as an image to include in a paper or report
+#choosing colors can be very challenging
+#many tools out there, e.g., color brewer
+#https://colorbrewer2.org/#type=sequential&scheme=BuPu&n=4
+
+#can save this map as a file or show directly in a quarto doc. To save as a file
+map_ch_transit <- ggplot() +
+  # geom_sf(data = orange_durham_parcels, fill="red", color=NA)+
+  # geom_sf(data = waterbodies, fill="blue", color="blue")+
+  geom_sf(data = orange_durham_osm_highways, color="black", fill="black", alpha=0.2)+
+  geom_sf(data = ch_bus_stops_quartile1, aes(color = quartile_label))+ 
+  scale_color_manual(values = c("lightblue","skyblue", "blue","black"))+
+  coord_sf(xlim = c(-79.12, -78.98), ylim = c(35.88, 35.98), expand=T ) + # map coordinates (lat/lon)
+  labs(colour="Buses per day (quartiles)") +
+  annotation_scale(location = "bl", width_hint = 0.3) +  # Scale bar
+  annotation_north_arrow(location = "tl", which_north = "true", 
+                         style = north_arrow_fancy_orienteering()) +  # North arrow
+  theme_minimal() 
+
+ggsave("plan372_gis_data/in_class_map.png", map_ch_transit)
+
+
+
+
+####end of class Feb 13
+
+
+#===============================================================================
+#---------------------LEAFLET FOR EXPLORING SPATIAL DATA------------------------
+#===============================================================================
+#ggplot not really good for exploration
+#can use leaflet instead
+library(leaflet) 
+#would recommend putting this at the top with all the other packages to keep things nice and organized
+#I'm including here for instructional purposes
+
+
+leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(data=ch_bus_stops_quartile1, popup=~stop_name)
+
+
+color_palette <- colorFactor(palette = "Set1", domain = ch_bus_stops$quartile)
+
+leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(data=ch_bus_stops_quartile1, color = ~color_palette(quartile), popup=~stop_name)
+
+ 
+leaflet() %>%
+  addTiles() %>%
+  addPolylines(data=orange_durham_osm_highways)
+
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.10, lat = 35.91, zoom = 10) %>%
+  addPolygons(data=orange_durham_osm_highways)
+
+
+
+#lat lon for Chapel Hill 35.91/-79.10
+leaflet() %>%
+  addTiles() %>%
+  addPolylines(data = orange_durham_osm_highways, color = "blue") %>%  # Use addPolylines for line data
+  addMarkers(data = ch_bus_stops_quartile1, popup = ~stop_name)
+  
+
+st_crs(orange_durham_osm_highways)
+
+#===============================================================================
+#-------------------------------SPATIAL ANALYSIS--------------------------------
+#===============================================================================
+
+unique(orange_durham_osm_highways$highway)
+st_crs(orange_durham_osm_highways)
+
+ch_major_roads <- orange_durham_osm_highways %>% 
+  filter(highway %in% c("motorway", "trunk", "primary")) %>%  #filter to road types  
+  st_transform(crs = 32617) %>% #reprojected into meters
+  st_buffer(dist = 150) # buffers by 150 meters (footprint of area affected by major roads)
+
+
+
+affected_properties <- ch_major_roads %>% 
+  st_join(orange_durham_parcels)
+ 
+#oops! I forgot to reproject my parcel dataset. Need to be the same projection
+
+orange_durham_parcels <- st_transform(orange_durham_parcels, crs = 32617)
+
+#now let's rerun our code
+affected_properties <- orange_durham_parcels %>% 
+  st_overlaps(ch_major_roads)
+
+affected_properties <- st_join(orange_durham_parcels, 
+                               ch_major_roads, 
+                               join = st_intersects, 
+                               left = TRUE) %>% 
+  mutate(near_highway = ifelse(is.na(highway),0, 1))
+
+
+
+
+#bring in construction information
+construction_permits <- read_csv("plan372_gis_data/parcel_permits.csv") %>% 
+  group_by(PIN) %>% 
+  summarize_all(sum, na.rm=T)
+
+colnames(construction_permits)
+  
+# Compute average development intensity (investment per square foot) near highways and not near highways zone
+# Think carefully about whether you are calculating average development intensity per square foot
+
+#1 m2 is 10.7639 ft2
+#join it with my affected property dataset
+affected_properties_w_construction <- affected_properties %>% 
+  mutate(area_sq_parcel = st_area(geometry)*10.7639,
+         area_sq_parcel = as.numeric(area_sq_parcel)) %>% 
+  filter(area_sq_parcel!=0) %>% 
+  st_drop_geometry() %>% 
+  left_join(construction_permits, by=c("PIN"="PIN")) %>% 
+  group_by(near_highway) %>% 
+  summarise(mean_construction1 = mean(total_construction_cost, na.rm=T),
+            mean_construction2 = mean(total_construction_cost/area_sq_parcel, na.rm=T) )
+
+```

@@ -4,21 +4,22 @@ title: GIS Exercise - libraries
 ---
 
 We are going to use data on library locations, in combination with Census
-data from assignment 3, to understand whether there are demographic differences in
+data, to understand whether there are demographic differences in
 the neighborhoods served by libraries.
 
 ```{r}
 library(tidyverse)
 library(sf)  # The sf package provides functions for working with spatial data
+library(ggspatial)
 ```
 
-First, we need to read in data. We'll start by reading the Census data from Assignment
-3, to get the hang of working with spatial datasets in R
-
-To read a shapefile or other spatial data format in R, we use the read_sf function. Move the Census data file from Assignment 3 into the `r_gis/data` folder, and adjust the path to match.
+First, we need to read in data. We'll start by reading some Census data. The geometries for the Census data
+are in the `orange_durham_wake_block_groups.shp` file in the GIS data folder, and call the dataset `census`.
 
 ```{r}
-census = read_sf(here::here("r_gis", "data", "hw3-data", "orange_durham_wake_block_groups.shp"))
+# answer:
+DATA_PATH = Sys.getenv("DATA_PATH")
+census = read_sf(file.path(DATA_PATH, "orange_durham_wake_block_groups.shp"))
 ```
 
 Spatial data in R is represented exactly the way the tabular data we've used in the past
@@ -30,21 +31,13 @@ about each row/feature.
 head(census)
 ```
 
-To make a map with R, we use ggplot, just like we did for graphics in the past.
-however, since maps usually use multiple layers in multiple tables, we specify
-the data in each geom_ call, rather than in the ggplot() call.
-
-```{r}
-ggplot() +
-  geom_sf(data=census)
-```
-
 There is no demographic information with the census data. That you'll have to get
-from the separate CSV file. We can read this using read_csv like we did before. As before,
-move the data and adjust the path as needed.
+from the separate CSV file, called `triangle_census.csv`. Read that as well, and call
+the dataset `census_demographics`.
 
 ```{r}
-census_demographics = read_csv(here::here("r_gis", "data", "hw3-data", "triangle_census.csv"))
+# answer
+census_demographics = read_csv(file.path(DATA_PATH, "triangle_census.csv"))
 ```
 
 We can just use a left join to associate this with the geographic information we already
@@ -70,7 +63,7 @@ We can re-read the census CSV and specify that the GEOID should be a character
 
 ```{r}
 census_demographics = read_csv(
-  here::here("r_gis", "data", "hw3-data", "triangle_census.csv"),
+  file.path(DATA_PATH, "triangle_census.csv"),
   col_types=c(GEOID="character")
 )
 ```
@@ -88,27 +81,25 @@ census = left_join(census, census_demographics, by="GEOID")
 head(census)
 ```
 
-Now, we can plot the map again, but symbolize by a variable - in this case, number of African-American individuals in each block group.
+Now, we can plot a map, and symbolize by a variable - in this case, number of African-American individuals in each block group.
 
 ```{r}
 ggplot() +
-  geom_sf(data=census, aes(fill=race_black_african_american_alone))
+  geom_sf(data=census, aes(fill=race_black_african_american_alone)) +
+    theme_minimal() +
+    # and this will remove the coordinates from the axes
+    theme(
+      axis.text = element_blank(),
+      panel.grid = element_blank()
+    ) +
+    annotation_scale() +
+    scale_fill_binned(
+      breaks=unname(quantile(census$race_black_african_american_alone), c(0, 0.2, 0.4, 0.6, 0.8, 1.0)),
+      limits=range(census$race_black_african_american_alone),
+      palette="Blues"
+    )
 ```
 
-We can clean that map up a bit. First, we'll get rid of the lines, by setting line width to 0 (lwd = 0)
-
-```{r}
-ggplot() +
-  geom_sf(data=census, aes(fill=race_black_african_american_alone), lwd=0)
-```
-
-We can also use a discrete rather than continuous scale
-
-```{r}
-ggplot() +
-  geom_sf(data=census, aes(fill=race_black_african_american_alone), lwd=0) +
-  scale_fill_fermenter(palette="Blues", n.breaks=5)
-```
 
 What might be misleading about this map?
 
@@ -118,24 +109,41 @@ We can calculate a percent African-American to account for population. Calculate
 
 ```{r}
 # answer:
-census$pct_african_american = census$race_black_african_american_alone / census$total_population * 100
+census = census |>
+  mutate(
+    pct_african_american = race_black_african_american_alone / total_population * 100
+  )
 ```
 
 and now map it again
 
 ```{r}
 ggplot() +
-  geom_sf(data=census, aes(fill=pct_african_american), lwd=0) +
-  scale_fill_fermenter(palette="Blues", n.breaks=5)
+  geom_sf(data=census, aes(fill=pct_african_american)) +
+    theme_minimal() +
+    # and this will remove the coordinates from the axes
+    theme(
+      axis.text = element_blank(),
+      panel.grid = element_blank()
+    ) +
+    annotation_scale() +
+    scale_fill_binned(
+      # adding na.rm because some places with total_population=0 have a percent African-American
+      # that is NA, because of division by zero
+      # I am also rounding to whole percents
+      breaks=round(unname(quantile(census$pct_african_american, c(0, 0.2, 0.4, 0.6, 0.8, 1.0), na.rm=T))),
+      limits=range(census$pct_african_american),
+      palette="Blues"
+    )
 ```
-
 
 ## Libraries 
 
-Now let's bring in data on libraries in Wake County, from Wake County Open Data
+Now let's bring in data on libraries in Wake County, from Wake County Open Data, which are in the Libraries.csv file. Call the dataset `libraries`.
 
 ```{r}
-libraries = read_csv(here::here("r_gis", "data", "Libraries.csv"))
+# answer
+libraries = read_csv(file.path(DATA_PATH, "Libraries.csv"))
 ```
 
 Now we convert it to spatial data
@@ -143,12 +151,11 @@ We need to specify the coordinates and the coordinate reference system (projecti
 which is 4326 for latitude/longitude
 
 ```{r}
+# answer
 libraries = st_as_sf(libraries, coords=c("lon", "lat"), crs=4326)
 ```
 
 ## Lets plot this to make sure it worked
-
-The code below maps both the Census data and the libraries, and demonstrates how to make a map with multiple layers.
 
 ```{r}
 ggplot() +
@@ -156,19 +163,12 @@ ggplot() +
   geom_sf(data=libraries, color="red")
 ```
 
-Now let's build a 1km buffer around the libraries. To do this, first we need
-to project the data. Unlike QGIS, we will need to do this for all layers involved
-in our analysis. We need to know the code for the NAD83 / North Carolina projection
-which is easiest to find by looking in QGIS.
+Now let's build a 1km buffer around the libraries.
 
 ```{r}
+# answer
 census = st_transform(census, 32119)
 libraries = st_transform(libraries, 32119)
-```
-
-Next, we can buffer the libraries.
-
-```{r}
 libraries_buffer = st_buffer(libraries, 1000)
 ```
 
@@ -178,27 +178,20 @@ libraries_buffer = st_buffer(libraries, 1000)
 ggplot() +
   geom_sf(data=census) +
   geom_sf(data=libraries_buffer, color="blue") +
-  geom_sf(data=libraries, color="red")
+  geom_sf(data=libraries, color="red") +
+  theme_minimal() +
+  # and this will remove the coordinates from the axes
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  ) +
+  annotation_scale()
 ```
 
-Now we need to identify the Census block groups which are near the libraries. We
-use the st_intersects function to find these.
-
+Now we need to identify the Census block groups which are near the libraries. Use st_intersects to add a `library_zone` column to the `census` dataset.
 ```{r}
-intersects = st_intersects(census, libraries_buffer)
-```
-
-In QGIS, select by location simply selects all block groups that intersect any feature
-in the buffer layer. R, on the other hand, returns a matrix (table), showing
-which block groups touch which buffers. We can use the apply function to turn this
-into single column. The apply function is used to apply an operation to every row or column
-of a table/matrix. The second argument indicates what to apply the operation to: 1 for rows,
-2 for columns. There is one row for each of the features in the first layer we gave to
-st_intersects, and one column for each feature in the second. So we want to apply the "any" operation to
-each row to find out if that parcel touched any other parcel. We save that as a new column.
-
-```{r}
-census$library_zone = apply(intersects, 1, any)
+# answer
+census$library_zone = apply(st_intersects(census, libraries_buffer), 1, any)
 ```
 
 Now, make a map showing census block groups in library service areas
@@ -206,7 +199,14 @@ Now, make a map showing census block groups in library service areas
 ```{r}
 ggplot() +
   geom_sf(data=census, aes(fill=library_zone)) +
-  geom_sf(data=libraries, color="red")
+  geom_sf(data=libraries, color="red") +
+  annotation_scale() +
+  theme_minimal() +
+  # and this will remove the coordinates from the axes
+  theme(
+    axis.text = element_blank(),
+    panel.grid = element_blank()
+  )
 ```
 
 
@@ -215,6 +215,7 @@ demographics of the region as a whole, using group_by
 
 ```{r}
 census |>
+    st_drop_geometry() |>
     group_by(library_zone) |>
     summarize(pct_white=sum(race_white_alone) / sum(total_population) * 100)
 ```
@@ -225,7 +226,9 @@ To find the demographics of the whole area, we can use summarize without groupin
 by any variable.
 
 ```{r}
-summarize(census, pct_white=sum(race_white_alone) / sum(total_population) * 100)
+census |>
+  st_drop_geometry() |>
+  summarize(pct_white=sum(race_white_alone) / sum(total_population) * 100)
 ```
 
 The libraries are run by Wake County, so the demographics of Orange and Durham
@@ -238,86 +241,12 @@ The COUNTYFP contains Census county FIPS codes. The code for Wake County is 183.
 wake = census |>
     filter(COUNTYFP=="183")
 
-group_by(wake, library_zone) |>
+wake |>
+  st_drop_geometry() |>
+  group_by(library_zone) |>
   summarize(pct_white=sum(race_white_alone) / sum(total_population) * 100)
 
-summarize(wake, pct_white=sum(race_white_alone) / sum(total_population) * 100)
-```
-
-## Exercise: Cardinal Cycle analysis
-
-Another public service in Wake County is Cardinal/Citrix Cycle bikeshare. Exercise: download
-the Cardinal Cycle station locations from the [Raleigh Open Data Portal](https://data-ral.opendata.arcgis.com/datasets/ral::cardinal-cycle-stations/explore?location=35.797935%2C-78.624284%2C9.84)
-and perform a similar analysis. 
-
-```{r}
-# answer: 
-cardinal_cycle = read_csv(here::here("r_gis", "data", "Cardinal_Cycle_Stations.csv"))
-```
-
-You may need to do some data cleaning to avoid errors when mapping.
-
-```{r}
-# answer:
-# There's one row where everything is NA. Remove it to avoid errors when running st_as_sf.
-cardinal_cycle = filter(cardinal_cycle, !is.na(X))
-
-cardinal_cycle = st_as_sf(cardinal_cycle, coords=c("X", "Y"), crs=4326)
-```
-
-
-### Map the stations, with Census block groups in the background
-
-```{r}
-# answer:
-ggplot() +
-  geom_sf(data=census) +
-  geom_sf(data=cardinal_cycle)
-```
-
-### Reproject and buffer the stations
-
-```{r}
-# answer:
-cardinal_cycle = st_transform(cardinal_cycle, 32119)
-cycle_buffer = st_buffer(cardinal_cycle, 1000)
-```
-
-### Make sure the buffer worked by making a map
-
-```{r}
-# answer:
-ggplot() +
-  geom_sf(data=census) +
-  geom_sf(data=cycle_buffer, color="blue") +
-  geom_sf(data=cardinal_cycle, color="red")
-```
-
-### find the block groups near Cardinal Cycle stations
-
-```{r}
-# answer:
-intersects = st_intersects(census, cycle_buffer)
-census$cycle_zone = apply(intersects, 1, any)
-```
-
-### plot the selected area
-
-```{r}
-# answer:
-ggplot() +
-  geom_sf(data=census, aes(fill=cycle_zone))
-```
-
-### compute demographics
-
-```{r}
-# answer
-group_by(census, cycle_zone) |>
+wake |>
+  st_drop_geometry() |>
   summarize(pct_white=sum(race_white_alone) / sum(total_population) * 100)
-```
-
-```{r}
-# answer
-summarize(census, pct_white=sum(race_white_alone) / sum(total_population) * 100)
 ```
