@@ -308,8 +308,13 @@ unique(total_entries$day_of_week)
 
 ### recode that to weekday/weekend
 ```{r}
-total_entries$weekend = case_match(total_entries$day_of_week, "Mon"~"weekday", "Tue"~"weekday", "Wed"~"weekday", "Thu"~"weekday",
-                               "Fri"~"weekday", "Sat"~"weekend", "Sun"~"weekend")
+total_entries = total_entries |> mutate(
+  weekend = case_match(
+    day_of_week,
+    c("Mon", "Tue", "Wed", "Thu", "Fri")~"weekday",
+    c("Sat", "Sun")~"weekend"
+  )
+)
 ```
 
 ### Make sure that there are no missing values
@@ -337,19 +342,11 @@ total_entries |>
 ```{r}
 total_entries$month = month(total_entries$date, label=T)
 total_entries$season = case_match(
-  total_entries$month,
-  "Jan" ~ "Winter",
-  "Feb" ~ "Winter",
-  "Mar" ~ "Winter",
-  "Apr" ~ "Spring",
-  "May" ~ "Spring",
-  "Jun" ~ "Summer",
-  "Jul" ~ "Summer",
-  "Aug" ~ "Summer",
-  "Sep" ~ "Fall",
-  "Oct" ~ "Fall",
-  "Nov" ~ "Fall",
-  "Dec" ~ "Winter"
+  month,
+  c("Dec", "Jan", "Feb") ~ "Winter",
+  c("Mar", "Apr", "May") ~ "Spring",
+  c("Jun", "Jul", "Aug") ~ "Summer",
+  c("Sep", "Oct", "Nov") ~ "Fall"
 )
 stopifnot(!any(is.na(total_entries$season)))
 
@@ -374,7 +371,27 @@ citywide_entries = total_entries |>
   ungroup()
 ```
 
-### Create a plot using the total_entries table.
+### Make a histogram
+
+The mean may cover up substantial variation. Let's make a histogram to see.
+
+The "gg" in ggplot2 stands for "grammar of graphics." The basic idea is that we have a language
+to define plots that consists of aesthetics (how aspects of the data map onto aspects of the plot)
+and geoms (geometries), how those aspects are displayed. There are some other elements, e.g. scales,
+which we'll cover later in the semester.
+
+To make a histogram, we are going to map the number of entries onto the x axis, and then use a histogram
+geom.
+
+```{r}
+citywide_entries |>
+  ggplot(aes(x=entries)) +
+    geom_histogram()
+```
+
+### Create a plot over time
+
+Some of this variation may be seasonal. Let's make a line plot showing parking demand over time.
 
 We define an "aesthetic" that the date will be the x axis, and the number of entries will be the y axis
 
@@ -489,8 +506,13 @@ Are the patterns of usage types different on the weekdays vs. the weekends?
 ```{r}
 # first, create a weekday/weekend column
 data$day_of_week = wday(data$date, label=T)
-data$weekend = case_match(data$day_of_week, "Mon"~"weekday", "Tue"~"weekday", "Wed"~"weekday", "Thu"~"weekday",
-                               "Fri"~"weekday", "Sat"~"weekend", "Sun"~"weekend")
+data = data |> mutate(
+    weekend = case_match(
+      day_of_week,
+      c("Mon", "Tue", "Wed", "Thu", "Fri")~"weekday",
+      c("Sat", "Sun")~"weekend"
+    )
+  )
 ```
 
 create a grouped data frame

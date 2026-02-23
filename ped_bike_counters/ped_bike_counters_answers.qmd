@@ -28,7 +28,7 @@ rows of the file have the date of the extract. With read_csv, we can skip the fi
 two rows, and start with the third that has the column names.
 
 ```{r}
-data = read_csv("ped_bike_counters/data/ncnmvdp.csv", skip=2)
+data = read_csv(here::here("ped_bike_counters", "data", "ncnmvdp.csv"), skip=2)
 head(data)
 ```
 
@@ -299,7 +299,7 @@ ggplot(hour_totals, aes(x=hour, y=hourly_count)) +
 
 Why didn't that work?
 
-We lost the hour variable when we did the group_by and summarize. After group_by and summarize, the only variables that remain are (1) the grouping variables, and (2) any variables you created in summarize. The easiest way to solve this is to just add the hour variable to the first summarize. Since the hour is the same within each group when the data are grouped by time and location, we can just use the `first` function to get the hour.
+We lost the hour variable when we did the group_by and summarize. After group_by and summarize, the only variables that remain are (1) the grouping variables, and (2) any variables you created in summarize. One way to solve this is to just add the hour variable to the first summarize. Since the hour is the same within each group when the data are grouped by time and location, we can just use the `first` function to get the hour.
 
 ```{r}
 data$hour = hour(data$Time)
@@ -325,13 +325,37 @@ ggplot(hour_totals, aes(x=hour, y=hourly_count)) +
 
 Note that the pattern looks similar, but the values on the y axis have changed significantly.
 
+A cleaner way to solve this is to just not create the hour variable until after the first summarize.
+
+```{r}
+hour_totals = data |>
+  # retain only rows where count is not NA (! means not)
+  filter(!is.na(count)) |>
+
+  # First, sum up within each hour at each location (put bikes and peds together)
+  # In this dataset, the Time column contains only whole hours (i.e. there are no records for, say, 8:30)
+  # If that were not the case, we'd need to make a new date_hour variable with floor_date.
+  group_by(Time, location) |>
+  summarize(count=sum(count)) |>
+  ungroup() |>
+  mutate(hour = hour(Time)) |>
+
+  # Next, take the mean of the hourly totals
+  group_by(hour, location) |>
+  summarize(hourly_count = mean(count)) |>
+  ungroup()
+
+ggplot(hour_totals, aes(x=hour, y=hourly_count)) +
+  geom_col() +
+    facet_wrap(~location)
+```
+
 ### Exercise: create a plot that shows average activity by day of week (hint: the wday function is helpful)
 
 ```{r}
 # answer:
 
 # label=T gives us the names of the days, not the numbers
-data$day_of_week = wday(data$Time, label=T)
 data$date = floor_date(data$Time, unit="d")
 day_totals = data |>
   # retain only rows where count is not NA (! means not)
@@ -339,7 +363,9 @@ day_totals = data |>
 
   # sum up at the day level
   group_by(date, location) |>
-  summarize(count=sum(count), day_of_week=first(day_of_week)) |>
+  summarize(count=sum(count)) |>
+  ungroup() |>
+  mutate(day_of_week=wday(date, label = TRUE)) |>
 
   # now, we can take the mean at the daily level. The two-step process is because we want to
   # take the mean daily number of passersby
