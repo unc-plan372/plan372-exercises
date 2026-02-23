@@ -164,9 +164,9 @@ Now, make those plots again, but scaled by total housing units
 ```{r}
 # answer:
 monthly_new_construction = group_by(data, econdep, survey_date) |>
-  summarize(total_units=sum(total_units) / sum(total_housing_units))
+  summarize(inc_prop=sum(total_units) / sum(total_units_2000))
 
-ggplot(monthly_new_construction, aes(x=survey_date, y=total_units, group=econdep, color=econdep)) +
+ggplot(monthly_new_construction, aes(x=survey_date, y=inc_prop, group=econdep, color=econdep)) +
   geom_line()
 ```
 
@@ -176,8 +176,8 @@ ggplot(monthly_new_construction, aes(x=survey_date, y=total_units, group=econdep
 # answer:
 data$year = year(data$survey_date)
 yearly_new_construction = group_by(data, econdep, year) |>
-  summarize(total_units=sum(total_units) / sum(total_housing_units))
-ggplot(yearly_new_construction, aes(x=year, y=total_units, group=econdep, color=econdep)) +
+  summarize(inc_prop=sum(total_units) / sum(total_units_2000))
+ggplot(yearly_new_construction, aes(x=year, y=inc_prop, group=econdep, color=econdep)) +
   geom_line()
 ```
 
@@ -185,7 +185,7 @@ ggplot(yearly_new_construction, aes(x=year, y=total_units, group=econdep, color=
 
 ```{r}
 # answer
-sum(is.na(data$total_housing_units))
+sum(is.na(data$total_units_2000))
 ```
 
 Figure out which county is causing the problem, and look it up on Wikipedia to find out why
@@ -195,7 +195,7 @@ to see that FIPS code 08 is Colorado.
 
 ```{r}
 # answer:
-nas = filter(data, is.na(total_housing_units))
+nas = filter(data, is.na(total_units_2000))
 unique(nas$county_name)
 unique(nas$state_fips)
 ```
@@ -204,7 +204,7 @@ Remove the NAs from the analysis
 
 ```{r}
 # answer:
-data = filter(data, !is.na(total_housing_units))
+data = filter(data, !is.na(total_units_2000))
 ```
 
 ### Exercise: recreate the plots
@@ -214,9 +214,9 @@ data = filter(data, !is.na(total_housing_units))
 ```{r}
 # answer:
 monthly_new_construction = group_by(data, econdep, survey_date) |>
-  summarize(total_units=sum(total_units) / sum(total_housing_units))
+  summarize(inc_prop=sum(total_units) / sum(total_units_2000))
 
-ggplot(monthly_new_construction, aes(x=survey_date, y=total_units, group=econdep, color=econdep)) +
+ggplot(monthly_new_construction, aes(x=survey_date, y=inc_prop, group=econdep, color=econdep)) +
   geom_line()
 ```
 
@@ -226,8 +226,8 @@ ggplot(monthly_new_construction, aes(x=survey_date, y=total_units, group=econdep
 # answer:
 data$year = year(data$survey_date)
 yearly_new_construction = group_by(data, econdep, year) |>
-  summarize(total_units=sum(total_units) / sum(total_housing_units))
-ggplot(yearly_new_construction, aes(x=year, y=total_units, group=econdep, color=econdep)) +
+  summarize(inc_prop=sum(total_units) / sum(total_units_2000))
+ggplot(yearly_new_construction, aes(x=year, y=inc_prop, group=econdep, color=econdep)) +
   geom_line()
 ```
 
