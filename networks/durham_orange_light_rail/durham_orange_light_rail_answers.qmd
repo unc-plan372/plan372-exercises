@@ -267,7 +267,7 @@ We'll use jobs as our opportunities, so the metric will tell us something about 
 ```{r}
 orange_durham_jobs = grab_lodes(
   state = "nc",
-  year = 2023,
+  year = 2022,
   # wac is workplace area characteristics, so telling us about where people work
   lodes_type = "wac",
   # JT00 is all jobs
@@ -314,9 +314,10 @@ blocks_with_jobs = orange_durham_blocks |> filter(C000 > 0)
 # sum will be 1 or greater), and a 90% chance it will show up as none. This way, we should
 # get roughly the right total number of dots.
 job_dots = st_sample(
-  blocks_with_jobs,
+  st_transform(blocks_with_jobs, 3857),
   floor(blocks_with_jobs$C000 / 50 + runif(nrow(blocks_with_jobs)))
-)
+) |>
+  st_transform(4326)
 
 ggplot() +
   annotation_map_tile() +
@@ -361,7 +362,8 @@ base_acc = accessibility(
   # peak express bus services.
   departure_datetime = ymd_hms("2026-03-25 07:30:00"),
   cutoffs = c(45),
-  time_window = 120L
+  time_window = 120L,
+  progress = T
 )
 
 head(base_acc)
@@ -421,7 +423,8 @@ scen_acc = accessibility(
   # peak express bus services.
   departure_datetime = ymd_hms("2026-03-25 07:30:00"),
   cutoffs = c(45),
-  time_window = 120L
+  time_window = 120L,
+  progress = TRUE
 )
 ```
 
